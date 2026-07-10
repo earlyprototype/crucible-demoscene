@@ -1,0 +1,393 @@
+/* Modern Business AI Tech Animations */
+
+/* Node entrance animations */
+.node {
+    animation: slideInUp 0.8s ease-out forwards;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.node:nth-child(1) { animation-delay: 0.1s; }
+.node:nth-child(2) { animation-delay: 0.2s; }
+.node:nth-child(3) { animation-delay: 0.3s; }
+.node:nth-child(4) { animation-delay: 0.4s; }
+.node:nth-child(5) { animation-delay: 0.5s; }
+.node:nth-child(6) { animation-delay: 0.6s; }
+.node:nth-child(7) { animation-delay: 0.7s; }
+.node:nth-child(8) { /* animation-delay: 0.8s; */ }
+
+@keyframes modern-entrance {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Header Animation */
+.header {
+    animation: modern-header-slide 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+@keyframes modern-header-slide {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Metrics Panel Animation */
+.metrics-panel {
+    position: fixed !important;
+    top: 20px !important;
+    right: 20px !important;
+    animation: modern-panel-slide 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation-delay: 1s;
+    opacity: 0;
+    transform: translateX(20px);
+}
+
+@keyframes modern-panel-slide {
+    0% {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Status Text Animation */
+.status-text {
+    animation: modern-status-pulse 3s ease-in-out infinite;
+}
+
+@keyframes modern-status-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Metric Update Animation */
+.metric-value.updated {
+    animation: modern-metric-update 0.4s ease-in-out;
+}
+
+@keyframes modern-metric-update {
+    0% {
+        transform: scale(1);
+        color: #00ff88;
+    }
+    50% {
+        transform: scale(1.05);
+        color: #ffffff;
+    }
+    100% {
+        transform: scale(1);
+        color: #00ff88;
+    }
+}
+
+/* Particle Animation */
+.particle {
+    animation: modern-particle-float 3s ease-in-out infinite;
+}
+
+@keyframes modern-particle-float {
+    0%, 100% {
+        opacity: 0.8;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+/* Loading Animation */
+.loading::after {
+    animation: modern-spin 1s linear infinite;
+}
+
+@keyframes modern-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Warning Pulse Animation */
+.node.warning {
+    animation: modern-warning-pulse 2s ease-in-out infinite;
+    border: 2px solid #ffaa00;
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+}
+
+@keyframes modern-warning-pulse {
+    0%, 100% { 
+        box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 20px rgba(255, 170, 0, 0.8);
+        transform: scale(1.02);
+    }
+}
+
+/* Error Shake Animation */
+.node.error {
+    animation: modern-error-shake 0.6s ease-in-out;
+    border: 2px solid #ff4444;
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+}
+
+@keyframes modern-error-shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+    20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+/* Success Glow Animation - EXCLUDES Lia CLI */
+.node.healthy:not(.user-entry) {
+    animation: modern-success-glow 4s ease-in-out infinite;
+}
+
+@keyframes modern-success-glow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.2);
+    }
+    100% {
+        box-shadow: 0 0 0 8px rgba(0, 255, 136, 0);
+    }
+}
+
+/* Lia CLI Blue Border - ONLY for Lia CLI */
+.node.user-entry.healthy {
+    border: 2px solid #3b82f6;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+/* Background Shift Animation */
+body {
+    animation: modern-background-shift 20s ease-in-out infinite;
+}
+
+@keyframes modern-background-shift {
+    0%, 100% {
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+    }
+    50% {
+        background: linear-gradient(135deg, #0a0a0a 0%, #1f1f1f 50%, #0a0a0a 100%);
+    }
+}
+
+/* Ripple Effect for Clicks */
+.node {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Smooth Hover Transitions */
+.node {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Node hover effects - only for healthy nodes (EXCLUDES Lia CLI) */
+.node.healthy:not(.user-entry):hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(0, 255, 255, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Lia CLI specific hover and active effects */
+.node.user-entry.healthy:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4) !important, 0 0 30px rgba(59, 130, 246, 0.3) !important;
+    background: rgba(59, 130, 246, 0.05) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Lia CLI blue click effect */
+.node.user-entry:active::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: ripple 0.6s ease-out;
+}
+
+/* Green click effect for other nodes (EXCLUDES Lia CLI) */
+.node:not(.user-entry):active::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(0, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: ripple 0.6s ease-out;
+}
+
+/* Service Details Panel Animation */
+.service-details {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+}
+
+.service-details h3 {
+    font-size: 0.8rem;
+    font-weight: 300;
+    color: #ffffff;
+    letter-spacing: 0.05em;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+}
+
+.service-details p {
+    font-size: 0.6rem;
+    font-weight: 300;
+    color: #888888;
+    letter-spacing: 0.02em;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.service-details.active {
+    animation: modern-modal-appear 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes modern-modal-appear {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* Flow Line Animation */
+.flow-line {
+    animation: modern-flow 3s linear infinite;
+}
+
+@keyframes modern-flow {
+    0% {
+        stroke-dashoffset: 0;
+    }
+    100% {
+        stroke-dashoffset: -14;
+    }
+}
+
+/* Pulse Animation for Status */
+.status-dot {
+    animation: modern-pulse 2s ease-in-out infinite;
+}
+
+@keyframes modern-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(0, 255, 136, 0);
+    }
+}
+
+/* Data Stream Animation */
+@keyframes modern-data-stream {
+    0% {
+        background-position: 0% 50%;
+    }
+    100% {
+        background-position: 100% 50%;
+    }
+}
+
+/* Glitch Effect (subtle) */
+@keyframes modern-glitch {
+    0%, 100% {
+        transform: translate(0);
+    }
+    20% {
+        transform: translate(-1px, 1px);
+    }
+    40% {
+        transform: translate(-1px, -1px);
+    }
+    60% {
+        transform: translate(1px, 1px);
+    }
+    80% {
+        transform: translate(1px, -1px);
+    }
+}
+
+/* Scan Line Effect */
+@keyframes modern-scan {
+    0% {
+        transform: translateY(-100%);
+    }
+    100% {
+        transform: translateY(100%);
+    }
+}
+
+/* Apply animations to elements */
+.node.error:hover {
+    animation: modern-glitch 0.2s ease-in-out;
+}
+
+.metrics-panel:hover {
+    animation: modern-data-stream 2s ease-in-out infinite;
+}
+
+/* Simple title tooltips - browser native */
+
+/* Responsive animations */
+@media (max-width: 768px) {
+    .node {
+        animation-duration: 0.4s;
+    }
+    
+    .metrics-panel {
+        animation-delay: 0.5s;
+        top: 20px;
+        right: 20px;
+    }
+    
+    .tooltip {
+        font-size: 0.6rem;
+        padding: 10px 14px;
+        max-width: 250px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+} 
