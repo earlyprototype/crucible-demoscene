@@ -1,6 +1,6 @@
 # Architecture Dashboard (3D)
 
-A real-time 3D visualization from Project Crucible v0.7 — service nodes
+A real-time 3D visualisation from Project Crucible v0.7 — service nodes
 rendered as glowing, translucent "ice crystal" geometries floating in fog,
 with soft shadows, ACES tone-mapping, and free orbit/zoom. Three.js loaded
 from CDN; otherwise vanilla JS + CSS, no build step.

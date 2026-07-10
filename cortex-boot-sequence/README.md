@@ -19,7 +19,7 @@ dependencies.
 
 ## Running it
 
-Needs a real terminal with ANSI color support (won't render right piped
+Needs a real terminal with ANSI colour support (won't render right piped
 through something that strips escape codes):
 
 ```bash
