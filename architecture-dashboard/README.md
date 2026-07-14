@@ -5,6 +5,12 @@ rendered as glowing, translucent "ice crystal" geometries floating in fog,
 with soft shadows, ACES tone-mapping, and free orbit/zoom. Three.js loaded
 from CDN; otherwise vanilla JS + CSS, no build step.
 
+<p>
+  <img src="assets/img/angle-front.png" width="32%" alt="Front view — central pyramid with orbiting service nodes">
+  <img src="assets/img/angle-orbit.png" width="32%" alt="Elevated three-quarter view of the scene">
+  <img src="assets/img/angle-low.png" width="32%" alt="Low wide view through the drifting triangle field">
+</p>
+
 ## Viewing it
 
 **Easiest — live demo, nothing to install:**

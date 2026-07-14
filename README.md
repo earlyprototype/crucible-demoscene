@@ -23,6 +23,12 @@ only the 3D scene — the part that was pure spectacle — survived the cut.
 
 **[▶ View it live](https://earlyprototype.github.io/crucible-demoscene/architecture-dashboard/)** — no install needed.
 
+<p>
+  <img src="architecture-dashboard/assets/img/angle-front.png" width="32%" alt="Front view — central pyramid with orbiting service nodes">
+  <img src="architecture-dashboard/assets/img/angle-orbit.png" width="32%" alt="Elevated three-quarter view of the scene">
+  <img src="architecture-dashboard/assets/img/angle-low.png" width="32%" alt="Low wide view through the drifting triangle field">
+</p>
+
 ## Provenance
 
 Both pulled from `components/cortex/` and `landing/` in the original v0.7
