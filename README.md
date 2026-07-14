@@ -25,7 +25,7 @@ only the 3D scene — the part that was pure spectacle — survived the cut.
 
 <p>
   <img src="architecture-dashboard/assets/img/angle-front.png" width="32%" alt="Front view — central pyramid with orbiting service nodes">
-  <img src="architecture-dashboard/assets/img/angle-orbit.png" width="32%" alt="Elevated three-quarter view of the scene">
+  <img src="architecture-dashboard/assets/img/angle-overhead.png" width="32%" alt="Overhead plan view — service nodes at the corners of the connection grid">
   <img src="architecture-dashboard/assets/img/angle-low.png" width="32%" alt="Low wide view through the drifting triangle field">
 </p>
 
