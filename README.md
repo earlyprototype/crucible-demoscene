@@ -21,6 +21,8 @@ A Three.js scene of the system's services rendered as glowing, translucent
 orbit/zoom. Originally one view inside a live 2D+3D monitoring dashboard;
 only the 3D scene — the part that was pure spectacle — survived the cut.
 
+**[▶ View it live](https://earlyprototype.github.io/crucible-demoscene/architecture-dashboard/)** — no install needed.
+
 ## Provenance
 
 Both pulled from `components/cortex/` and `landing/` in the original v0.7

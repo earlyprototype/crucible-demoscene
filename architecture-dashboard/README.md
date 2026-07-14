@@ -5,18 +5,26 @@ rendered as glowing, translucent "ice crystal" geometries floating in fog,
 with soft shadows, ACES tone-mapping, and free orbit/zoom. Three.js loaded
 from CDN; otherwise vanilla JS + CSS, no build step.
 
-*Screenshots pending.*
-
 ## Viewing it
 
-Static files, so any local server works:
+**Easiest — live demo, nothing to install:**
 
-```bash
-python -m http.server 8080
-# open http://localhost:8080
-```
+**<https://earlyprototype.github.io/crucible-demoscene/architecture-dashboard/>**
 
 Drag to rotate, scroll to zoom, click to focus on a node.
+
+**Running it locally:**
+
+1. Download the **whole repository** (green **Code** button → **Download ZIP**, then unzip) or `git clone` it. Saving `index.html` on its own won't work — the page needs the `assets/` folder beside it.
+2. Open a terminal **inside the `architecture-dashboard/` folder** and start any static server:
+
+   ```bash
+   python -m http.server 8080
+   ```
+
+3. Open <http://localhost:8080> in your browser.
+
+Either way you need an internet connection — Three.js and fonts load from a CDN. If the scene fails to load, a message now appears on the page saying what went wrong.
 
 ## Original context
 
