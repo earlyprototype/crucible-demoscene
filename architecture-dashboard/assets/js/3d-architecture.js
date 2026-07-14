@@ -1152,22 +1152,32 @@ class Architecture3D {
 // Initialize 3D architecture when DOM is loaded
 let architecture3D = null;
 
+function showLoadError(message) {
+    const container = document.getElementById('three-container');
+    if (container) {
+        container.innerHTML = `<div style="color:#ff6b6b;font-family:monospace;padding:2rem;max-width:32rem;">
+            <strong>Scene failed to load</strong><br>${message}
+        </div>`;
+    }
+    console.error(message);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     try {
         console.log('Initializing 3D architecture...');
-        
+
         // Check if Three.js is loaded
         if (typeof THREE === 'undefined') {
-            console.error('Three.js library not loaded!');
+            showLoadError('Three.js failed to load from the CDN. Check your internet connection (or an ad-blocker/firewall blocking cdnjs.cloudflare.com) and refresh.');
             return;
         }
-        
+
         // Check if OrbitControls is available
         if (typeof THREE.OrbitControls === 'undefined') {
-            console.error('OrbitControls not loaded!');
+            showLoadError('OrbitControls failed to load from the CDN (cdn.jsdelivr.net). Check your internet connection and refresh.');
             return;
         }
-        
+
         // Initialize 3D architecture
         architecture3D = new Architecture3D();
         
@@ -1180,39 +1190,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // Handle view toggle
-        const toggleBtn = document.getElementById('toggle-view');
-        const toggleText = document.getElementById('toggle-text');
-        const architecture2D = document.getElementById('architecture-2d');
-        const architecture3DContainer = document.getElementById('architecture-3d');
-        
-        if (!toggleBtn || !toggleText || !architecture2D || !architecture3DContainer) {
-            console.error('Required DOM elements not found for view toggle');
-            return;
-        }
-        
-        let is3DView = false;
-        
-        toggleBtn.addEventListener('click', () => {
-            is3DView = !is3DView;
-            
-            if (is3DView) {
-                architecture2D.style.display = 'none';
-                architecture3DContainer.style.display = 'block';
-                toggleText.textContent = 'Switch to 2D';
-                toggleBtn.innerHTML = '<i class="fas fa-th-large"></i><span id="toggle-text">Switch to 2D</span>';
-                console.log('Switched to 3D view');
-            } else {
-                architecture2D.style.display = 'grid';
-                architecture3DContainer.style.display = 'none';
-                toggleText.textContent = 'Switch to 3D';
-                toggleBtn.innerHTML = '<i class="fas fa-cube"></i><span id="toggle-text">Switch to 3D</span>';
-                console.log('Switched to 2D view');
-            }
-        });
-        
         console.log('Advanced 3D Architecture initialized');
-        
+
     } catch (error) {
         console.error('Error initializing 3D architecture:', error);
     }
