@@ -13,7 +13,7 @@ from CDN; otherwise vanilla JS + CSS, no build step.
 
 ## Viewing it
 
-**Easiest — live demo, nothing to install:**
+**Live demo**
 
 **<https://earlyprototype.github.io/crucible-demoscene/architecture-dashboard/>**
 
@@ -21,7 +21,7 @@ Drag to rotate, scroll to zoom, click to focus on a node.
 
 **Running it locally:**
 
-1. Download the **whole repository** (green **Code** button → **Download ZIP**, then unzip) or `git clone` it. Saving `index.html` on its own won't work — the page needs the `assets/` folder beside it.
+1. Download the **whole repository** (green **Code** button → **Download ZIP**, then unzip) or `git clone` it. 
 2. Open a terminal **inside the `architecture-dashboard/` folder** and start any static server:
 
    ```bash
@@ -30,13 +30,6 @@ Drag to rotate, scroll to zoom, click to focus on a node.
 
 3. Open <http://localhost:8080> in your browser.
 
-Either way you need an internet connection — Three.js and fonts load from a CDN. If the scene fails to load, a message now appears on the page saying what went wrong.
-
 ## Original context
 
-This was originally one of two views in a live ops dashboard for v0.7 (the
-other was a 2D node-graph with real health-checks and data-flow particles).
-Only the 3D scene survived the cut here — it's the part that was pure
-spectacle rather than monitoring, and stands on its own without the rest of
-v0.7's backend. `3d-architecture.js` is otherwise unmodified from the
-original.
+This was originally one of two views in a live ops dashboard that was stylised.
