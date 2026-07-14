@@ -1,12 +1,9 @@
 # Architecture Dashboard (3D)
 
-A real-time 3D visualisation from Project Crucible v0.7 — service nodes
+A real-time 3D visualisation of an abstracted AI agent assisted workflow architecture — service nodes
 rendered as glowing, translucent "ice crystal" geometries floating in fog,
 with soft shadows, ACES tone-mapping, and free orbit/zoom. Three.js loaded
 from CDN; otherwise vanilla JS + CSS, no build step.
-
-The file's own header comment calls it "monochromatic design and breathing
-effects" — this exists to look good, not to monitor anything.
 
 *Screenshots pending.*
 
