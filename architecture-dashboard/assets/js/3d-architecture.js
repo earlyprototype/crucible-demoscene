@@ -1,6 +1,8 @@
 // 3D Architecture Visualization for Project Crucible v0.7
 // Advanced Three.js implementation with monochromatic design and breathing effects
 
+const PICK_RADIUS_PX = 2;
+
 class Architecture3D {
     constructor() {
         this.scene = null;
@@ -110,8 +112,9 @@ class Architecture3D {
             canvas.setPointerCapture(event.pointerId);
         });
         const checkDrag = event => {
+            // OrbitControls starts rotating on the first displacement.
             if (press && event.pointerId === press.id &&
-                Math.hypot(event.clientX - press.x, event.clientY - press.y) > 4) press = null;
+                (event.clientX !== press.x || event.clientY !== press.y)) press = null;
         };
         canvas.addEventListener('pointermove', checkDrag);
         canvas.addEventListener('lostpointercapture', () => { press = null; });
@@ -125,41 +128,37 @@ class Architecture3D {
                 (event.clientX - bounds.left) / bounds.width * 2 - 1,
                 1 - (event.clientY - bounds.top) / bounds.height * 2
             );
-            const part = this.pickPart(pointer, bounds);
-            if (part) this.focusService(this.services[part.userData.serviceId]);
+            try {
+                const service = this.pickService(pointer, bounds);
+                if (service) this.focusService(service);
+            } catch (error) {
+                this.fail(error.message);
+            }
         });
     }
 
-    pickPart(pointer, bounds) {
+    pickParts(pointer, bounds) {
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(pointer, this.camera);
         const far = Math.min(this.camera.far, this.scene.fog.far);
-        let closestZ = new THREE.Vector3(0, 0, -far).applyMatrix4(this.camera.projectionMatrix).z;
-        let closestPart = null;
+        const farZ = new THREE.Vector3(0, 0, -far).applyMatrix4(this.camera.projectionMatrix).z;
+        const hits = [];
         const meshes = this.pickableParts.filter(part => part.isMesh);
         for (const { point, object } of raycaster.intersectObjects(meshes)) {
             const z = point.project(this.camera).z;
-            if (z >= -1 && z < closestZ) {
-                closestZ = z;
-                closestPart = object;
-                break; // Raycaster returns intersections in order from the camera.
-            }
+            if (z >= -1 && z < farZ) hits.push({ z, part: object });
         }
 
         const pixelsPerNdc = new THREE.Vector2(bounds.width / 2, bounds.height / 2);
         for (const part of this.pickableParts) {
             if (!part.isLineSegments) continue;
             const z = this.projectedWireDepth(part, pointer, pixelsPerNdc, far);
-            if (z < closestZ) {
-                closestZ = z;
-                closestPart = part;
-            }
+            if (z < farZ) hits.push({ z, part });
         }
-        return closestPart;
+        return hits.sort((a, b) => a.z - b.z).map(hit => hit.part);
     }
 
     projectedWireDepth(wire, pointer, pixelsPerNdc, far) {
-        const tolerancePx = 2;
         const { near, matrixWorldInverse, projectionMatrix } = this.camera;
         const modelView = new THREE.Matrix4().multiplyMatrices(matrixWorldInverse, wire.matrixWorld);
         const vertices = wire.geometry.getAttribute('position');
@@ -185,12 +184,95 @@ class Architecture3D {
             toPointer.subVectors(pointer, start).multiply(pixelsPerNdc);
             const lengthSq = edge.lengthSq();
             const t = lengthSq ? THREE.MathUtils.clamp(toPointer.dot(edge) / lengthSq, 0, 1) : 0;
-            if (toPointer.addScaledVector(edge, -t).lengthSq() <= tolerancePx * tolerancePx) {
+            if (toPointer.addScaledVector(edge, -t).lengthSq() <= PICK_RADIUS_PX * PICK_RADIUS_PX) {
                 // Projected Z varies linearly along the screen segment.
                 closestZ = Math.min(closestZ, THREE.MathUtils.lerp(start.z, end.z, t));
             }
         }
         return closestZ;
+    }
+
+    pickPatch(pointer, bounds) {
+        const { renderer } = this;
+        const gl = renderer.getContext();
+        const x = (1 + pointer.x) * gl.drawingBufferWidth / 2;
+        const y = (1 + pointer.y) * gl.drawingBufferHeight / 2;
+        const scaleX = gl.drawingBufferWidth / bounds.width;
+        const scaleY = gl.drawingBufferHeight / bounds.height;
+        const left = Math.max(0, Math.floor(x - PICK_RADIUS_PX * scaleX));
+        const bottom = Math.max(0, Math.floor(y - PICK_RADIUS_PX * scaleY));
+        const width = Math.min(gl.drawingBufferWidth, Math.ceil(x + PICK_RADIUS_PX * scaleX)) - left;
+        const height = Math.min(gl.drawingBufferHeight, Math.ceil(y + PICK_RADIUS_PX * scaleY)) - bottom;
+        if (width <= 0 || height <= 0) return null;
+
+        const bytes = new Uint8Array(4 * width * height);
+        const readColors = () => {
+            gl.readPixels(left, bottom, width, height, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+            const colors = [];
+            for (let row = 0; row < height; row++) {
+                for (let col = 0; col < width; col++) {
+                    const dx = (left + col + 0.5 - x) / scaleX;
+                    const dy = (bottom + row + 0.5 - y) / scaleY;
+                    if (Math.hypot(dx, dy) > PICK_RADIUS_PX) continue;
+                    const i = 4 * (row * width + col);
+                    colors.push((bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]);
+                }
+            }
+            return colors;
+        };
+
+        // Three.js floors the origin and size separately at fractional pixel ratios.
+        const ratio = renderer.getPixelRatio();
+        const x0 = Math.floor(left / ratio);
+        const y0 = Math.floor(bottom / ratio);
+        const scissor = new THREE.Vector4(x0, y0,
+            Math.ceil((left + width + 1) / ratio) - x0, Math.ceil((bottom + height + 1) / ratio) - y0);
+        return { scissor, readColors };
+    }
+
+    pickService(pointer, bounds) {
+        const parts = this.pickParts(pointer, bounds);
+        if (!parts.length) return null;
+        const patch = this.pickPatch(pointer, bounds);
+        if (!patch) return null;
+        const { renderer, scene, camera } = this;
+        const candidates = new Set(parts.map(part => this.services[part.userData.serviceId]));
+        const samples = [];
+
+        // Omit each candidate from the same patch to test its contribution after
+        // fog, blending and antialiasing, even when other geometry is nearby.
+        const scissor = renderer.getScissor(new THREE.Vector4());
+        const scissorTest = renderer.getScissorTest();
+        const updateShadows = renderer.shadowMap.autoUpdate;
+        renderer.shadowMap.autoUpdate = false;
+        renderer.setScissor(patch.scissor);
+        renderer.setScissorTest(true);
+        try {
+            for (const service of candidates) {
+                const { edgeMesh, innerMesh } = service.userData;
+                const visible = [service, edgeMesh, innerMesh].filter(part => part.visible);
+                for (const part of visible) part.visible = false;
+                try {
+                    renderer.render(scene, camera);
+                    samples.push({ service, without: patch.readColors() });
+                } finally {
+                    for (const part of visible) part.visible = true;
+                }
+            }
+        } finally {
+            renderer.setScissor(scissor);
+            renderer.setScissorTest(scissorTest);
+            renderer.shadowMap.autoUpdate = updateShadows;
+        }
+
+        // Present the complete frame with every service restored.
+        renderer.render(scene, camera);
+        const frame = patch.readColors();
+        const background = scene.background.getHex();
+        for (const { service, without } of samples) {
+            if (frame.some((color, i) => color !== background && color !== without[i])) return service;
+        }
+        return null;
     }
 
     setupViewControls() {

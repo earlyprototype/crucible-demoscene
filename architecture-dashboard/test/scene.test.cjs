@@ -39,9 +39,9 @@ test('only the visible span of a wire is pickable and the nearer surface wins', 
         new THREE.Vector3(1, 0, -15), new THREE.Vector3(1, 0, 1)
     ]));
     scene.pickableParts = [wire];
-    const pick = (x, y) => scene.pickPart(new THREE.Vector2(
+    const pick = (x, y) => scene.pickParts(new THREE.Vector2(
         2 * x / bounds.width - 1, 1 - 2 * y / bounds.height
-    ), bounds);
+    ), bounds)[0] ?? null;
 
     // At x = 1 in camera space, the near and fog planes project to pixels 700 and 430.
     assert.equal(pick(740, 300), null, 'Wire in front of the near plane');

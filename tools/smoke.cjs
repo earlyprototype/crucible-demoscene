@@ -28,18 +28,84 @@ async function checkFrame(page) {
     console.log(`PASS rendered crystal frame (${lit} lit pixels)`);
 }
 
+async function clickBackground(page, x, y) {
+    const patch = PNG.sync.read(await page.screenshot({ clip: { x: x - 4, y: y - 4, width: 9, height: 9 } }));
+    const background = await page.evaluate(() => architecture3D.scene.background.getHex());
+    for (let i = 0; i < patch.data.length; i += 4) {
+        assert.equal(patch.data.readUIntBE(i, 3), background, `Expected empty space around (${x}, ${y})`);
+    }
+    const focus = () => page.evaluate(() => ({
+        label: document.getElementById('focus-name').textContent,
+        target: architecture3D.controls.target.toArray()
+    }));
+    const before = await focus();
+    await page.mouse.click(x, y);
+    assert.deepEqual(await focus(), before, `Clicking empty space at (${x}, ${y}) changed focus`);
+}
+
+async function checkShortDrag(page) {
+    const orientation = () => page.evaluate(() => architecture3D.camera.quaternion.toArray());
+    const before = await orientation();
+    await page.mouse.move(697, 591);
+    await page.mouse.down();
+    await page.mouse.move(700, 591);
+    assert.notDeepEqual(await orientation(), before, 'Three-pixel drag should rotate the camera');
+    await page.mouse.up();
+    assert.deepEqual(await page.evaluate(() => architecture3D.controls.target.toArray()), [0, 0, 0],
+        'Three-pixel drag also selected a service');
+    assert.equal(await page.locator('#focus-name').innerText(), 'All services');
+    await page.keyboard.press('Home');
+    console.log('PASS three-pixel drag rotates and preserves focus');
+}
+
+async function checkFogPicking(page) {
+    async function zoomOut() {
+        await page.evaluate(() => {
+            const { camera, controls } = architecture3D;
+            camera.position.sub(controls.target).setLength(controls.maxDistance).add(controls.target);
+            controls.update();
+        });
+        await page.clock.runFor(16);
+    }
+
+    await page.keyboard.press('[');
+    assert.equal(await page.locator('#focus-name').innerText(), 'dendrite-api');
+    await zoomOut();
+    await page.mouse.move(512, 360);
+    await page.mouse.down();
+    await page.mouse.move(492, 360);
+    await page.mouse.up();
+    await page.evaluate(() => architecture3D.clearOrbitMomentum());
+    await page.clock.runFor(16);
+    await clickBackground(page, 416, 344);
+    await page.keyboard.press('Home');
+    await zoomOut();
+    await clickBackground(page, 448, 292);
+    // Put a data triangle on the same ray while the animation clock is paused.
+    const triangle = await page.evaluateHandle(() => {
+        const { dataTriangles, camera, scene, renderer } = architecture3D;
+        const marker = dataTriangles[0].clone();
+        marker.position.set(2 * 448 / 1024 - 1, 1 - 2 * 292 / 720, 0.99).unproject(camera);
+        marker.quaternion.copy(camera.quaternion);
+        marker.scale.setScalar(0.1);
+        scene.add(marker);
+        renderer.render(scene, camera);
+        return marker;
+    });
+    const patch = PNG.sync.read(await page.screenshot({ clip: { x: 447, y: 291, width: 2, height: 2 } }));
+    assert.ok(patch.data.some((value, i) => i % 4 === 0 && value > 0), 'Expected a visible data triangle at the click');
+    await page.mouse.click(448, 292);
+    assert.deepEqual(await page.evaluate(() => architecture3D.controls.target.toArray()), [0, 0, 0],
+        'A nearby data triangle made an invisible service selectable');
+    assert.equal(await page.locator('#focus-name').innerText(), 'All services');
+    await triangle.evaluate(marker => architecture3D.scene.remove(marker));
+    await triangle.dispose();
+    await page.keyboard.press('Home');
+    console.log('PASS background clicks at maximum zoom-out preserve target and focus label');
+}
+
 async function checkClosePicking(page) {
     const target = () => page.evaluate(() => architecture3D.controls.target.toArray());
-    async function clickBackground(x, y) {
-        const patch = PNG.sync.read(await page.screenshot({ clip: { x: x - 4, y: y - 4, width: 9, height: 9 } }));
-        const background = await page.evaluate(() => architecture3D.scene.background.getHex());
-        for (let i = 0; i < patch.data.length; i += 4) {
-            assert.equal(patch.data.readUIntBE(i, 3), background, `Expected empty space around (${x}, ${y})`);
-        }
-        const before = await target();
-        await page.mouse.click(x, y);
-        assert.deepEqual(await target(), before, `Clicking empty space at (${x}, ${y}) changed the orbit target`);
-    }
 
     for (let i = 0; i < 4; i++) await page.keyboard.press(']');
     assert.equal(await page.locator('#focus-name').innerText(), 'memory-api');
@@ -47,7 +113,7 @@ async function checkClosePicking(page) {
     for (let i = 0; i < 11; i++) await page.mouse.wheel(0, -100);
     await page.waitForFunction(() => architecture3D.camera.position.distanceTo(architecture3D.controls.target) < 20);
     await page.clock.runFor(16);
-    await clickBackground(72, 400);
+    await clickBackground(page, 72, 400);
 
     for (const [endY, clickX, clickY] of [[618, 235, 441], [623, 100, 120]]) {
         await page.keyboard.press('Home');
@@ -59,7 +125,7 @@ async function checkClosePicking(page) {
         await page.evaluate(() => architecture3D.clearOrbitMomentum());
         await page.clock.runFor(16);
         assert.notDeepEqual(await target(), [0, 0, 0], 'Right drag should pan the target');
-        await clickBackground(clickX, clickY);
+        await clickBackground(page, clickX, clickY);
     }
     await page.keyboard.press('Home');
     await page.clock.runFor(16);
@@ -215,6 +281,8 @@ async function main() {
         assert.match(await page.evaluate(() => window.statusBeforeScene), /starting/i);
         assert.equal(await status.getAttribute('data-state'), 'active', await status.innerText());
         await checkFrame(page);
+        await checkShortDrag(page);
+        await checkFogPicking(page);
         await checkClosePicking(page);
         await checkControls(page);
         await checkNarrowView(page);
