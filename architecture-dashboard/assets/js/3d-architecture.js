@@ -343,7 +343,6 @@ class Architecture3D {
             breathingPhase: Math.random() * Math.PI * 2,
             shapeShiftPhase: Math.random() * Math.PI * 2,
             glimmerPhase: Math.random() * Math.PI * 2,
-            isActive: true,
             basePosition: { ...position },
             scale: scale,
             isOrbiting: serviceId === 'lia-cli' || serviceId === 'context-engine', // LIA_CLI and Context Engine orbit
@@ -851,7 +850,7 @@ class Architecture3D {
             }
             
             // Breathing effect for triangles (edge mesh) - only edge triangles for non-Thalamus modules, but NOT CLI and Context Engine
-            if (userData.edgeMesh && userData.isActive && userData.serviceId !== 'thalamus-gateway' && 
+            if (userData.edgeMesh && userData.serviceId !== 'thalamus-gateway' &&
                 userData.serviceId !== 'lia-cli' && userData.serviceId !== 'context-engine') {
                 const breathingScale = 1 + Math.sin(this.time * 0.5 + userData.breathingPhase) * 0.5; // 50% breathing
                 const minScale = 1.1; // 10% wider than dark triangles at minimum
@@ -955,10 +954,6 @@ class Architecture3D {
                         }
                     }
                 }
-            } else if (userData.edgeMesh && !userData.isActive) {
-                // Inactive modules: no breathing, just static darker appearance
-                userData.edgeMesh.scale.setScalar(userData.scale);
-                userData.edgeMesh.material.opacity = 0.3; // Darker appearance
             }
             
             // Animate inner mesh - no rotation for non-Thalamus modules
@@ -970,15 +965,10 @@ class Architecture3D {
                     // Fully opaque white color for Thalamus inner triangles (no fading)
                     userData.innerMesh.material.color.setHex(0xffffff);
                     userData.innerMesh.material.opacity = 1.0; // Fully opaque
-                }
-                userData.innerMesh.scale.setScalar(userData.scale);
-                
-                // Inactive modules: darker inner mesh
-                if (!userData.isActive) {
-                    userData.innerMesh.material.opacity = 0.1;
-                } else if (userData.serviceId !== 'thalamus-gateway') {
+                } else {
                     userData.innerMesh.material.opacity = 0.3;
                 }
+                userData.innerMesh.scale.setScalar(userData.scale);
             }
             
             // Orbiting animation for Lia-CLI and Context Engine - ONLY rotation about fixed point centered over Thalamus
@@ -1118,35 +1108,6 @@ class Architecture3D {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
-    
-    updateServiceStatus(serviceId, isActive) {
-        const service = this.services[serviceId];
-        if (service) {
-            service.userData.isActive = isActive;
-            
-            if (isActive) {
-                service.material.emissiveIntensity = 0.3;
-                service.userData.rotationSpeed = 0.008;
-                // Reset opacity for active state
-                if (service.userData.edgeMesh) {
-                    service.userData.edgeMesh.material.opacity = 0.9;
-                }
-                if (service.userData.innerMesh) {
-                    service.userData.innerMesh.material.opacity = 0.3;
-                }
-            } else {
-                service.material.emissiveIntensity = 0.05;
-                service.userData.rotationSpeed = 0.001;
-                // Set darker opacity for inactive state
-                if (service.userData.edgeMesh) {
-                    service.userData.edgeMesh.material.opacity = 0.3;
-                }
-                if (service.userData.innerMesh) {
-                    service.userData.innerMesh.material.opacity = 0.1;
-                }
-            }
-        }
-    }
 }
 
 // Initialize 3D architecture when DOM is loaded
@@ -1195,4 +1156,4 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (error) {
         console.error('Error initializing 3D architecture:', error);
     }
-}); 
+});
