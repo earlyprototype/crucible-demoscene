@@ -124,12 +124,8 @@ class Architecture3D {
             if (!press || press.id !== event.pointerId || !this.isInitialized) return;
             press = null;
             const bounds = canvas.getBoundingClientRect();
-            const pointer = new THREE.Vector2(
-                (event.clientX - bounds.left) / bounds.width * 2 - 1,
-                1 - (event.clientY - bounds.top) / bounds.height * 2
-            );
             try {
-                const service = this.pickService(pointer, bounds);
+                const service = this.pickService(event.clientX - bounds.left, event.clientY - bounds.top, bounds);
                 if (service) this.focusService(service);
             } catch (error) {
                 this.fail(error.message);
@@ -192,87 +188,69 @@ class Architecture3D {
         return closestZ;
     }
 
-    pickPatch(pointer, bounds) {
-        const { renderer } = this;
-        const gl = renderer.getContext();
-        const x = (1 + pointer.x) * gl.drawingBufferWidth / 2;
-        const y = (1 + pointer.y) * gl.drawingBufferHeight / 2;
-        const scaleX = gl.drawingBufferWidth / bounds.width;
-        const scaleY = gl.drawingBufferHeight / bounds.height;
-        const left = Math.max(0, Math.floor(x - PICK_RADIUS_PX * scaleX));
-        const bottom = Math.max(0, Math.floor(y - PICK_RADIUS_PX * scaleY));
-        const width = Math.min(gl.drawingBufferWidth, Math.ceil(x + PICK_RADIUS_PX * scaleX)) - left;
-        const height = Math.min(gl.drawingBufferHeight, Math.ceil(y + PICK_RADIUS_PX * scaleY)) - bottom;
-        if (width <= 0 || height <= 0) return null;
-
-        const bytes = new Uint8Array(4 * width * height);
-        const readColors = () => {
-            gl.readPixels(left, bottom, width, height, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
-            const colors = [];
-            for (let row = 0; row < height; row++) {
-                for (let col = 0; col < width; col++) {
-                    const dx = (left + col + 0.5 - x) / scaleX;
-                    const dy = (bottom + row + 0.5 - y) / scaleY;
-                    if (Math.hypot(dx, dy) > PICK_RADIUS_PX) continue;
-                    const i = 4 * (row * width + col);
-                    colors.push((bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]);
-                }
-            }
-            return colors;
-        };
-
-        // Three.js floors the origin and size separately at fractional pixel ratios.
-        const ratio = renderer.getPixelRatio();
-        const x0 = Math.floor(left / ratio);
-        const y0 = Math.floor(bottom / ratio);
-        const scissor = new THREE.Vector4(x0, y0,
-            Math.ceil((left + width + 1) / ratio) - x0, Math.ceil((bottom + height + 1) / ratio) - y0);
-        return { scissor, readColors };
-    }
-
-    pickService(pointer, bounds) {
-        const parts = this.pickParts(pointer, bounds);
-        if (!parts.length) return null;
-        const patch = this.pickPatch(pointer, bounds);
-        if (!patch) return null;
+    pickService(canvasX, canvasY, bounds) {
         const { renderer, scene, camera } = this;
-        const candidates = new Set(parts.map(part => this.services[part.userData.serviceId]));
-        const samples = [];
+        const gl = renderer.getContext();
+        if (!(canvasX >= 0 && canvasX < bounds.width && canvasY >= 0 && canvasY < bounds.height)) return null;
+        const x = Math.floor(canvasX * gl.drawingBufferWidth / bounds.width);
+        const y = gl.drawingBufferHeight - 1 - Math.floor(canvasY * gl.drawingBufferHeight / bounds.height);
+        const readPixel = bytes => gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
 
-        // Omit each candidate from the same patch to test its contribution after
-        // fog, blending and antialiasing, even when other geometry is nearby.
+        // The browser may discard the drawing buffer after presenting a frame.
+        renderer.render(scene, camera);
+        const frame = new Uint8Array(4);
+        readPixel(frame);
+        if (((frame[0] << 16) | (frame[1] << 8) | frame[2]) === scene.background.getHex()) return null;
+
+        const without = new Uint8Array(4);
+        let strongest = 0;
+        const contributors = [];
         const scissor = renderer.getScissor(new THREE.Vector4());
         const scissorTest = renderer.getScissorTest();
         const updateShadows = renderer.shadowMap.autoUpdate;
-        renderer.shadowMap.autoUpdate = false;
-        renderer.setScissor(patch.scissor);
+        const ratio = renderer.getPixelRatio();
+        // Three.js scales and floors all four scissor values. Aim inside each integer bin.
+        renderer.setScissor((x + 0.5) / ratio, (y + 0.5) / ratio, 1.5 / ratio, 1.5 / ratio);
         renderer.setScissorTest(true);
+        renderer.shadowMap.autoUpdate = false;
         try {
-            for (const service of candidates) {
+            // Compare the composited pixel with each crystal omitted. A silhouette
+            // can cover a multisample even when no geometry crosses the center ray.
+            for (const service of Object.values(this.services)) {
                 const { edgeMesh, innerMesh } = service.userData;
                 const visible = [service, edgeMesh, innerMesh].filter(part => part.visible);
                 for (const part of visible) part.visible = false;
                 try {
                     renderer.render(scene, camera);
-                    samples.push({ service, without: patch.readColors() });
+                    readPixel(without);
                 } finally {
                     for (const part of visible) part.visible = true;
                 }
+                const change = Math.abs(frame[0] - without[0]) + Math.abs(frame[1] - without[1]) +
+                    Math.abs(frame[2] - without[2]);
+                if (change === 0 || change < strongest) continue;
+                if (change > strongest) contributors.length = 0;
+                strongest = change;
+                contributors.push(service);
             }
+            renderer.render(scene, camera);
         } finally {
             renderer.setScissor(scissor);
             renderer.setScissorTest(scissorTest);
             renderer.shadowMap.autoUpdate = updateShadows;
         }
 
-        // Present the complete frame with every service restored.
-        renderer.render(scene, camera);
-        const frame = patch.readColors();
-        const background = scene.background.getHex();
-        for (const { service, without } of samples) {
-            if (frame.some((color, i) => color !== background && color !== without[i])) return service;
+        // For equal color contributions, prefer the nearer visible surface.
+        if (contributors.length < 2) return contributors[0] ?? null;
+        const center = new THREE.Vector2(
+            (x + 0.5) * 2 / gl.drawingBufferWidth - 1,
+            (y + 0.5) * 2 / gl.drawingBufferHeight - 1
+        );
+        for (const part of this.pickParts(center, bounds)) {
+            const service = this.services[part.userData.serviceId];
+            if (contributors.includes(service)) return service;
         }
-        return null;
+        return contributors[0];
     }
 
     setupViewControls() {

@@ -58,6 +58,39 @@ async function checkShortDrag(page) {
     console.log('PASS three-pixel drag rotates and preserves focus');
 }
 
+async function checkOpeningClicks(browser) {
+    const cases = [
+        [1, 490.5, 375.5, 'thalamus-gateway', [0, 0, 0]],
+        [1, 365.5, 449.5, 'memory-api', [-8, -10, -8]],
+        [1, 356, 466, 'memory-api', [-8, -10, -8]],
+        [1, 654, 576, 'dendrite-api', [8, -10, 8]],
+        [0.25, 654, 576, 'dendrite-api', [8, -10, 8]],
+        [0.25, 696, 592, 'dendrite-api', [8, -10, 8]]
+    ];
+    const results = [];
+    for (const scale of [1, 0.25]) {
+        const page = await browser.newPage({
+            viewport: { width: 1024, height: 720 }, deviceScaleFactor: scale, offline: true
+        });
+        try {
+            await seedOpeningFrame(page);
+            for (const [ratio, x, y] of cases.filter(([ratio]) => ratio === scale)) {
+                await page.goto(url);
+                assert.equal(await page.locator('#render-status').getAttribute('data-state'), 'active');
+                const bufferSize = await page.locator('#three-container canvas').evaluate(canvas => [canvas.width, canvas.height]);
+                assert.deepEqual(bufferSize, [1024 * scale, 720 * scale], 'Opening-frame drawing-buffer size');
+                await page.mouse.click(x, y);
+                results.push([ratio, x, y, await page.locator('#focus-name').innerText(),
+                    await page.evaluate(() => architecture3D.controls.target.toArray())]);
+            }
+        } finally {
+            await page.close();
+        }
+    }
+    assert.deepEqual(results, cases, 'Opening-frame clicks must focus the service visible at the pixel');
+    console.log('PASS opening-frame HUD labels and orbit targets at native and fractional scales');
+}
+
 async function checkFogPicking(page) {
     async function zoomOut() {
         await page.evaluate(() => {
@@ -250,6 +283,21 @@ async function checkNarrowView(page) {
     console.log('PASS narrow-screen framing');
 }
 
+async function seedOpeningFrame(page) {
+    await page.addInitScript(() => {
+        document.addEventListener('DOMContentLoaded', () => {
+            window.statusBeforeScene = document.getElementById('render-status').textContent;
+        });
+        let seed = 7;
+        Math.random = () => {
+            seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+            return seed / 4294967296;
+        };
+    });
+    await page.clock.install({ time: new Date('2025-01-01T00:00:00Z') });
+    await page.clock.pauseAt(new Date('2025-01-01T00:01:00Z'));
+}
+
 async function main() {
     execFileSync(process.env.PYTHON || 'python', [path.join(__dirname, 'smoke_terminal.py')], {
         stdio: ['ignore', 'inherit', 'inherit'], timeout: 30000
@@ -259,23 +307,13 @@ async function main() {
         args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']
     });
     try {
+        await checkOpeningClicks(browser);
         const page = await browser.newPage({ viewport: { width: 1024, height: 720 }, offline: true });
         page.setDefaultTimeout(10000);
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
         page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-        await page.addInitScript(() => {
-            document.addEventListener('DOMContentLoaded', () => {
-                window.statusBeforeScene = document.getElementById('render-status').textContent;
-            });
-            let seed = 7;
-            Math.random = () => {
-                seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-                return seed / 4294967296;
-            };
-        });
-        await page.clock.install({ time: new Date('2025-01-01T00:00:00Z') });
-        await page.clock.pauseAt(new Date('2025-01-01T00:01:00Z'));
+        await seedOpeningFrame(page);
         await page.goto(url);
         const status = page.locator('#render-status');
         assert.match(await page.evaluate(() => window.statusBeforeScene), /starting/i);
