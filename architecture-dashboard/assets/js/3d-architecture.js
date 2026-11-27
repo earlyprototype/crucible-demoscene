@@ -149,14 +149,19 @@ class Architecture3D {
         });
     }
 
+    clearOrbitMomentum() {
+        // An undamped update consumes the remaining pan and rotation in one step.
+        const damping = this.controls.enableDamping;
+        this.controls.enableDamping = false;
+        this.controls.update();
+        this.controls.enableDamping = damping;
+    }
+
     changeView(action) {
         if (action === 'reset') {
             this.focusedService = null;
-            // Consume any remaining drag momentum before restoring the saved view.
-            this.controls.enableDamping = false;
-            this.controls.update();
+            this.clearOrbitMomentum();
             this.controls.reset();
-            this.controls.enableDamping = true;
             document.getElementById('focus-name').textContent = 'All services';
             return;
         }
@@ -167,6 +172,7 @@ class Architecture3D {
     }
 
     focusService(service) {
+        this.clearOrbitMomentum();
         this.focusedService = service;
         this.lastFocusPosition.copy(service.position);
         this.camera.position.add(this.focusOffset.subVectors(service.position, this.controls.target));

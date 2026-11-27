@@ -57,6 +57,20 @@ async function checkControls(page) {
 
     await page.keyboard.press('Home');
     await page.mouse.move(512, 360);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(600, 360, { steps: 4 });
+    await page.mouse.up({ button: 'right' });
+    assert.notDeepEqual(await target(), [0, 0, 0], 'Right drag should pan the target');
+    await page.clock.runFor(16);
+    const afterPan = await project('dendrite-api');
+    await page.mouse.click(afterPan.x, afterPan.y);
+    assert.equal(await page.locator('#focus-name').innerText(), 'dendrite-api');
+    assert.deepEqual(await target(), [8, -10, 8], 'Orbit target should match the crystal immediately after the click');
+    await page.clock.runFor(64);
+    assert.deepEqual(await target(), [8, -10, 8], 'Orbit target drifted after focusing the crystal');
+
+    await page.keyboard.press('Home');
+    await page.mouse.move(512, 360);
     await page.mouse.down();
     await page.mouse.move(565, 360, { steps: 3 });
     await page.mouse.move(512, 360, { steps: 3 });
@@ -81,12 +95,16 @@ async function checkControls(page) {
     await page.getByRole('button', { name: /reset view/i }).click();
     assert.deepEqual(await target(), [0, 0, 0]);
     assert.deepEqual(await camera(), initialCamera);
-    console.log('PASS click, drag, empty space, keyboard and HUD controls');
+    console.log('PASS click, pan then focus, drag, empty space, keyboard and HUD controls');
 }
 
 async function checkNarrowView(page) {
+    await page.evaluate(() => {
+        window.smokeResized = false;
+        window.addEventListener('resize', () => { window.smokeResized = true; }, { once: true });
+    });
     await page.setViewportSize({ width: 360, height: 640 });
-    await page.clock.runFor(32);
+    await page.waitForFunction(() => window.smokeResized, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => architecture3D.camera.aspect), 360 / 640);
     const cropped = await page.evaluate(() => {
         const { services, camera } = architecture3D;
