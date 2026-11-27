@@ -29,6 +29,32 @@ only the 3D scene — the part that was pure spectacle — survived the cut.
   <img src="architecture-dashboard/assets/img/angle-low.png" width="32%" alt="Low wide view through the drifting triangle field">
 </p>
 
+## Build and smoke check
+
+Install Node.js 18 or later, Python 3.10 or later, and Google Chrome. Run
+`npm ci` once from the repository root to install the locked dependencies.
+Run the build and both smoke checks from the same directory.
+
+```sh
+npm run smoke
+```
+
+The command builds an offline dashboard in `dist/architecture-dashboard/`,
+runs the scene tests, and plays all three Python entry points with a fixed
+random seed, simulated Enter input, and no delays. Headless Chrome checks
+pixels from the visible canvas and tests the mouse, keyboard, and HUD controls.
+In the seeded 1024 by 720 opening frame, it clicks crystal silhouettes and
+overlapping services and checks both the focus label and orbit target. It
+also checks dendrite-api at a device scale factor of 0.25.
+It checks that a three-pixel drag rotates the camera and keeps the current
+focus. At close zoom, at maximum zoom-out in fog, and after panning up to a
+wire, it samples the background around each test click and checks that the
+target and focus label stay put. It also checks focus after a pan, all seven
+crystals in the narrow view, and visible failure messages when the scene
+script cannot load or WebGL cannot start. A failed check exits with an error.
+Set `PYTHON` to the Python executable if needed. To use an installed Microsoft
+Edge browser, set `SMOKE_BROWSER_CHANNEL` to `msedge`.
+
 ## Provenance
 
 Both pulled from `components/cortex/` and `landing/` in the original v0.7

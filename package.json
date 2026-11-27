@@ -1,0 +1,14 @@
+{
+  "name": "crucible-demoscene",
+  "private": true,
+  "scripts": {
+    "build": "node tools/build.cjs",
+    "test": "node --test",
+    "smoke": "npm run build && npm test && node tools/smoke.cjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.56.1",
+    "pngjs": "7.0.0",
+    "three": "0.128.0"
+  }
+}

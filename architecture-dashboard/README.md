@@ -1,9 +1,8 @@
 # Architecture Dashboard (3D)
 
-A real-time 3D visualisation of an abstracted AI agent assisted workflow architecture — service nodes
-rendered as glowing, translucent "ice crystal" geometries floating in fog,
-with soft shadows, ACES tone-mapping, and free orbit/zoom. Three.js loaded
-from CDN; otherwise vanilla JS + CSS, no build step.
+Seven services appear as translucent crystals in a Three.js scene. Angled
+facets catch a cool rim light, and wireframes trace each crystal through the
+fog. The live page loads Three.js and OrbitControls from a CDN.
 
 <p>
   <img src="assets/img/angle-front.png" width="32%" alt="Front view — central pyramid with orbiting service nodes">
@@ -17,7 +16,14 @@ from CDN; otherwise vanilla JS + CSS, no build step.
 
 **<https://earlyprototype.github.io/crucible-demoscene/architecture-dashboard/>**
 
-Drag to rotate and scroll to zoom.
+Drag to rotate and scroll to zoom. Click to focus on a service. The camera
+follows an orbiting service until you choose another view. Clicking empty
+space keeps the current target.
+
+Use **Previous** (`[`) and **Next** (`]`) to cycle through the services.
+**Reset view** (`Home`) restores the opening camera position and zoom.
+The status above the scene changes to active after the first frame renders.
+If a script or WebGL fails, the status shows the cause.
 
 **Running it locally:**
 
@@ -29,6 +35,9 @@ Drag to rotate and scroll to zoom.
    ```
 
 3. Open <http://localhost:8080> in your browser.
+
+For a build with local copies of both libraries, follow the
+[build and smoke check](../README.md#build-and-smoke-check).
 
 ## Original context
 
