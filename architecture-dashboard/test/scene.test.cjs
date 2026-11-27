@@ -28,6 +28,35 @@ test('the scene hint and README describe the available camera controls', () => {
     }
 });
 
+test('only the visible span of a wire is pickable and the nearer surface wins', () => {
+    const THREE = require('three');
+    const { Architecture3D } = dashboardFixture({ THREE });
+    const scene = Object.create(Architecture3D.prototype);
+    const bounds = { width: 800, height: 600 };
+    scene.camera = new THREE.PerspectiveCamera(90, bounds.width / bounds.height, 1, 20);
+    scene.scene = { fog: new THREE.Fog(0, 5, 10) };
+    const wire = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(1, 0, -15), new THREE.Vector3(1, 0, 1)
+    ]));
+    scene.pickableParts = [wire];
+    const pick = (x, y) => scene.pickPart(new THREE.Vector2(
+        2 * x / bounds.width - 1, 1 - 2 * y / bounds.height
+    ), bounds);
+
+    // At x = 1 in camera space, the near and fog planes project to pixels 700 and 430.
+    assert.equal(pick(740, 300), null, 'Wire in front of the near plane');
+    assert.equal(pick(420, 300), null, 'Wire beyond the fog limit');
+    assert.equal(pick(500, 301), wire, 'Visible wire within one CSS pixel');
+    assert.equal(pick(500, 304), null, 'Empty space beside the wire');
+
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(8, 8));
+    face.position.z = -4;
+    face.updateMatrixWorld();
+    scene.pickableParts.push(face);
+    assert.equal(pick(500, 300), wire, 'Wire at depth 3 is in front of the face');
+    assert.equal(pick(450, 300), face, 'Wire at depth 6 is behind the face');
+});
+
 for (const [name, libraries, explanation] of [
     ['missing Three.js', {}, /Three\.js/],
     ['missing OrbitControls', { THREE: {} }, /OrbitControls/],

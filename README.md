@@ -44,7 +44,9 @@ runs the scene tests, and plays all three Python entry points with a fixed
 random seed, simulated Enter input, and no delays. Headless Chrome checks
 pixels from the visible canvas and tests the mouse, keyboard, and HUD controls.
 It checks that focus holds after a pan and that clicking a crystal hidden by
-fog keeps the current target. It also checks that all seven crystals fit in
+fog keeps the current target. At close zoom and after panning up to a wire,
+it samples the background around each test click and checks that the orbit
+target stays put. It also checks that all seven crystals fit in
 the narrow view and that the dashboard shows the cause when the scene script
 cannot load or WebGL cannot start. A failed check exits with an error.
 Set `PYTHON` to the Python executable if needed. To use an installed Microsoft

@@ -101,9 +101,6 @@ class Architecture3D {
 
     setupPicking() {
         const canvas = this.renderer.domElement;
-        const raycaster = new THREE.Raycaster();
-        const viewPoint = new THREE.Vector3();
-        raycaster.params.Line.threshold = 0.15;
         let press = null;
         canvas.addEventListener('pointerdown', event => {
             press = null;
@@ -128,14 +125,72 @@ class Architecture3D {
                 (event.clientX - bounds.left) / bounds.width * 2 - 1,
                 1 - (event.clientY - bounds.top) / bounds.height * 2
             );
-            raycaster.setFromCamera(pointer, this.camera);
-            const hit = raycaster.intersectObjects(this.pickableParts).find(({ point }) => {
-                // Three.js measures linear fog depth along the camera's negative Z axis.
-                const depth = -viewPoint.copy(point).applyMatrix4(this.camera.matrixWorldInverse).z;
-                return depth < this.scene.fog.far;
-            });
-            if (hit) this.focusService(this.services[hit.object.userData.serviceId]);
+            const part = this.pickPart(pointer, bounds);
+            if (part) this.focusService(this.services[part.userData.serviceId]);
         });
+    }
+
+    pickPart(pointer, bounds) {
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(pointer, this.camera);
+        const far = Math.min(this.camera.far, this.scene.fog.far);
+        let closestZ = new THREE.Vector3(0, 0, -far).applyMatrix4(this.camera.projectionMatrix).z;
+        let closestPart = null;
+        const meshes = this.pickableParts.filter(part => part.isMesh);
+        for (const { point, object } of raycaster.intersectObjects(meshes)) {
+            const z = point.project(this.camera).z;
+            if (z >= -1 && z < closestZ) {
+                closestZ = z;
+                closestPart = object;
+                break; // Raycaster returns intersections in order from the camera.
+            }
+        }
+
+        const pixelsPerNdc = new THREE.Vector2(bounds.width / 2, bounds.height / 2);
+        for (const part of this.pickableParts) {
+            if (!part.isLineSegments) continue;
+            const z = this.projectedWireDepth(part, pointer, pixelsPerNdc, far);
+            if (z < closestZ) {
+                closestZ = z;
+                closestPart = part;
+            }
+        }
+        return closestPart;
+    }
+
+    projectedWireDepth(wire, pointer, pixelsPerNdc, far) {
+        const tolerancePx = 2;
+        const { near, matrixWorldInverse, projectionMatrix } = this.camera;
+        const modelView = new THREE.Matrix4().multiplyMatrices(matrixWorldInverse, wire.matrixWorld);
+        const vertices = wire.geometry.getAttribute('position');
+        let start = new THREE.Vector3();
+        let end = new THREE.Vector3();
+        const edge = new THREE.Vector2();
+        const toPointer = new THREE.Vector2();
+        let closestZ = Infinity;
+        // WireframeGeometry stores one pair of endpoints per rendered edge.
+        for (let i = 0; i < vertices.count; i += 2) {
+            start.fromBufferAttribute(vertices, i).applyMatrix4(modelView);
+            end.fromBufferAttribute(vertices, i + 1).applyMatrix4(modelView);
+            if (start.z < end.z) [start, end] = [end, start];
+
+            // Camera space looks down -Z. Clip before the perspective divide.
+            if (end.z > -near || start.z <= -far) continue;
+            if (start.z > -near) start.lerp(end, (-near - start.z) / (end.z - start.z));
+            if (end.z < -far) end.lerp(start, (-far - end.z) / (start.z - end.z));
+            start.applyMatrix4(projectionMatrix);
+            end.applyMatrix4(projectionMatrix);
+
+            edge.subVectors(end, start).multiply(pixelsPerNdc);
+            toPointer.subVectors(pointer, start).multiply(pixelsPerNdc);
+            const lengthSq = edge.lengthSq();
+            const t = lengthSq ? THREE.MathUtils.clamp(toPointer.dot(edge) / lengthSq, 0, 1) : 0;
+            if (toPointer.addScaledVector(edge, -t).lengthSq() <= tolerancePx * tolerancePx) {
+                // Projected Z varies linearly along the screen segment.
+                closestZ = Math.min(closestZ, THREE.MathUtils.lerp(start.z, end.z, t));
+            }
+        }
+        return closestZ;
     }
 
     setupViewControls() {

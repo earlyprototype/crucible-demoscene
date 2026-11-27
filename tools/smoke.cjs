@@ -28,6 +28,44 @@ async function checkFrame(page) {
     console.log(`PASS rendered crystal frame (${lit} lit pixels)`);
 }
 
+async function checkClosePicking(page) {
+    const target = () => page.evaluate(() => architecture3D.controls.target.toArray());
+    async function clickBackground(x, y) {
+        const patch = PNG.sync.read(await page.screenshot({ clip: { x: x - 4, y: y - 4, width: 9, height: 9 } }));
+        const background = await page.evaluate(() => architecture3D.scene.background.getHex());
+        for (let i = 0; i < patch.data.length; i += 4) {
+            assert.equal(patch.data.readUIntBE(i, 3), background, `Expected empty space around (${x}, ${y})`);
+        }
+        const before = await target();
+        await page.mouse.click(x, y);
+        assert.deepEqual(await target(), before, `Clicking empty space at (${x}, ${y}) changed the orbit target`);
+    }
+
+    for (let i = 0; i < 4; i++) await page.keyboard.press(']');
+    assert.equal(await page.locator('#focus-name').innerText(), 'memory-api');
+    await page.mouse.move(512, 360);
+    for (let i = 0; i < 11; i++) await page.mouse.wheel(0, -100);
+    await page.waitForFunction(() => architecture3D.camera.position.distanceTo(architecture3D.controls.target) < 20);
+    await page.clock.runFor(16);
+    await clickBackground(72, 400);
+
+    for (const [endY, clickX, clickY] of [[618, 235, 441], [623, 100, 120]]) {
+        await page.keyboard.press('Home');
+        await page.mouse.move(512, 80);
+        await page.mouse.down({ button: 'right' });
+        await page.mouse.move(431, endY);
+        await page.mouse.up({ button: 'right' });
+        // Consume the remaining pan while the animation clock is paused.
+        await page.evaluate(() => architecture3D.clearOrbitMomentum());
+        await page.clock.runFor(16);
+        assert.notDeepEqual(await target(), [0, 0, 0], 'Right drag should pan the target');
+        await clickBackground(clickX, clickY);
+    }
+    await page.keyboard.press('Home');
+    await page.clock.runFor(16);
+    console.log('PASS empty-space clicks at close zoom and after both pans');
+}
+
 async function checkControls(page) {
     const target = () => page.evaluate(() => architecture3D.controls.target.toArray());
     const camera = () => page.evaluate(() => architecture3D.camera.position.toArray());
@@ -177,6 +215,7 @@ async function main() {
         assert.match(await page.evaluate(() => window.statusBeforeScene), /starting/i);
         assert.equal(await status.getAttribute('data-state'), 'active', await status.innerText());
         await checkFrame(page);
+        await checkClosePicking(page);
         await checkControls(page);
         await checkNarrowView(page);
         assert.deepEqual(errors, [], 'Browser reported a render or script error');
