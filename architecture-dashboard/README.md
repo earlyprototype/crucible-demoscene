@@ -17,7 +17,7 @@ from CDN; otherwise vanilla JS + CSS, no build step.
 
 **<https://earlyprototype.github.io/crucible-demoscene/architecture-dashboard/>**
 
-Drag to rotate, scroll to zoom, click to focus on a node.
+Drag to rotate and scroll to zoom.
 
 **Running it locally:**
 
