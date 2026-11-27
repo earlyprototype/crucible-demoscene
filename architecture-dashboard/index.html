@@ -36,6 +36,10 @@
         </div>
     </div>
 
-    <script src="assets/js/3d-architecture.js"></script>
+    <script src="assets/js/3d-architecture.js" onerror="
+        const status = document.getElementById('render-status');
+        status.dataset.state = 'failed';
+        status.textContent = '3D renderer failed. The scene script could not load.';
+    "></script>
 </body>
 </html>

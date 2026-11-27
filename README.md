@@ -43,9 +43,10 @@ The command builds an offline dashboard in `dist/architecture-dashboard/`,
 runs the scene tests, and plays all three Python entry points with a fixed
 random seed, simulated Enter input, and no delays. Headless Chrome checks
 pixels from the visible canvas and tests the mouse, keyboard, and HUD controls.
-It checks that focus holds after a pan, all seven crystals fit in the narrow
-view, and a visible error appears when WebGL is unavailable. A failed check
-exits with an error.
+It checks that focus holds after a pan and that clicking a crystal hidden by
+fog keeps the current target. It also checks that all seven crystals fit in
+the narrow view and that the dashboard shows the cause when the scene script
+cannot load or WebGL cannot start. A failed check exits with an error.
 Set `PYTHON` to the Python executable if needed. To use an installed Microsoft
 Edge browser, set `SMOKE_BROWSER_CHANNEL` to `msedge`.
 

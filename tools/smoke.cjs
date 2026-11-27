@@ -38,6 +38,30 @@ async function checkControls(page) {
         return { x: rect.left + (x + 1) * rect.width / 2, y: rect.top + (1 - y) * rect.height / 2 };
     }, id);
     const initialCamera = await camera();
+    await page.evaluate(() => {
+        const { camera, controls } = architecture3D;
+        camera.position.z = controls.maxDistance;
+        controls.update();
+    });
+    await page.clock.runFor(16);
+    // At 1024 x 720 this ray hits memory-api behind the far edge of the fog.
+    await page.mouse.click(448, 401);
+    assert.deepEqual(await target(), [0, 0, 0], 'Clicking a fully fogged crystal changed focus');
+
+    // View dendrite-api from the side. Its ray is longer than 100, but its depth is under 100.
+    await page.evaluate(() => {
+        const { camera, controls } = architecture3D;
+        controls.target.set(0, 0, -55);
+        camera.position.set(controls.maxDistance, 0, -55);
+        controls.update();
+    });
+    await page.clock.runFor(16);
+    const offAxis = await project('dendrite-api');
+    await page.mouse.click(offAxis.x, offAxis.y);
+    assert.deepEqual(await target(), [8, -10, 8], 'Off-axis crystal inside the fog limit should be selectable');
+
+    await page.keyboard.press('Home');
+    await page.clock.runFor(16);
     const service = await project('dendrite-api');
     await page.mouse.click(service.x, service.y);
     assert.deepEqual(await target(), [8, -10, 8], 'Click should target the visible crystal');
@@ -95,7 +119,7 @@ async function checkControls(page) {
     await page.getByRole('button', { name: /reset view/i }).click();
     assert.deepEqual(await target(), [0, 0, 0]);
     assert.deepEqual(await camera(), initialCamera);
-    console.log('PASS click, pan then focus, drag, empty space, keyboard and HUD controls');
+    console.log('PASS click, fog depth, pan then focus, drag, empty space, keyboard and HUD controls');
 }
 
 async function checkNarrowView(page) {
@@ -156,6 +180,18 @@ async function main() {
         await checkControls(page);
         await checkNarrowView(page);
         assert.deepEqual(errors, [], 'Browser reported a render or script error');
+
+        const sceneScript = '**/assets/js/3d-architecture.js';
+        await page.route(sceneScript, route => route.abort());
+        await page.reload();
+        assert.ok(await status.isVisible());
+        assert.equal(await status.getAttribute('data-state'), 'failed', await status.innerText());
+        assert.match(await status.innerText(), /scene script.*load/i);
+        for (const name of [/previous/i, /next/i, /reset view/i]) {
+            assert.ok(await page.getByRole('button', { name }).isDisabled(), `Expected disabled control matching ${name}`);
+        }
+        console.log('PASS visible scene script load failure with controls disabled');
+        await page.unroute(sceneScript);
 
         await page.addInitScript(() => {
             const getContext = HTMLCanvasElement.prototype.getContext;

@@ -102,6 +102,7 @@ class Architecture3D {
     setupPicking() {
         const canvas = this.renderer.domElement;
         const raycaster = new THREE.Raycaster();
+        const viewPoint = new THREE.Vector3();
         raycaster.params.Line.threshold = 0.15;
         let press = null;
         canvas.addEventListener('pointerdown', event => {
@@ -128,7 +129,11 @@ class Architecture3D {
                 1 - (event.clientY - bounds.top) / bounds.height * 2
             );
             raycaster.setFromCamera(pointer, this.camera);
-            const [hit] = raycaster.intersectObjects(this.pickableParts);
+            const hit = raycaster.intersectObjects(this.pickableParts).find(({ point }) => {
+                // Three.js measures linear fog depth along the camera's negative Z axis.
+                const depth = -viewPoint.copy(point).applyMatrix4(this.camera.matrixWorldInverse).z;
+                return depth < this.scene.fog.far;
+            });
             if (hit) this.focusService(this.services[hit.object.userData.serviceId]);
         });
     }
