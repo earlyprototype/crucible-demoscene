@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'">
+  <title>Cortex terminal trilogy</title>
+  <style>
+    :root { color-scheme: dark; background: #111516; color: #e4e9e8; font: 100% system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 62rem; margin: clamp(1.5rem, 7vh, 5rem) auto; padding: 0 1rem; }
+    h1 { margin: 0 0 1.25rem; font-size: clamp(1.5rem, 4vw, 2.5rem); letter-spacing: -.035em; }
+    pre {
+      margin: 0; min-height: 18em; padding: clamp(.65rem, 2vw, 1.5rem);
+      overflow-x: auto; border: 1px solid #404949; border-radius: .5rem;
+      background: #070909; font: clamp(.75rem, 1.7vw, 1rem)/1.18 ui-monospace, Consolas, monospace;
+      font-variant-ligatures: none;
+    }
+    .ansi-91 { color: #ff5555; }
+    .ansi-92 { color: #55ff55; }
+    .ansi-94 { color: #5555ff; }
+    .controls { display: flex; align-items: end; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+    label { display: block; margin-bottom: .35rem; color: #c5cfcd; font-size: .875rem; }
+    button, select { padding: .5rem .8rem; border: 1px solid #64706d; border-radius: .3rem; font: inherit; }
+    button { min-width: 5rem; background: #e4e9e8; color: #111516; cursor: pointer; }
+    select { background: #202625; color: inherit; }
+    .seek { flex: 1 1 12rem; }
+    output { float: right; font: .875rem ui-monospace, monospace; }
+    input { width: 100%; margin: 0; height: 2.25rem; accent-color: #c9d7d3; }
+    :focus-visible { outline: 2px solid #c9d7d3; outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Cortex terminal trilogy</h1>
+    <pre id="screen" role="region" tabindex="0" aria-label="Terminal output"></pre>
+    <div class="controls">
+      <button id="play" type="button">Play</button>
+      <div>
+        <label for="chapter">Chapter</label>
+        <select id="chapter"></select>
+      </div>
+      <div class="seek">
+        <output id="count" for="frame" aria-live="off"></output>
+        <label for="frame">Frame</label>
+        <input id="frame" type="range" min="1" step="1" value="1">
+      </div>
+    </div>
+    <noscript>Enable JavaScript to play this recording.</noscript>
+  </main>
+  <script type="application/json" id="recording">{{RECORDING}}</script>
+  <script>
+    const chapters = JSON.parse(document.getElementById("recording").textContent);
+    const chapter = document.getElementById("chapter");
+    const slider = document.getElementById("frame");
+    const screen = document.getElementById("screen");
+    const count = document.getElementById("count");
+    const play = document.getElementById("play");
+    chapters.forEach(({name}, index) => chapter.add(new Option(name, index)));
+    let frameIndex = 0;
+    let timer = null;
+
+    function frames() {
+      return chapters[chapter.selectedIndex].frames;
+    }
+
+    function render() {
+      const sequence = frames();
+      const spans = sequence[frameIndex].runs.map(([color, text]) => {
+        const span = document.createElement("span");
+        span.className = "ansi-" + color;
+        span.textContent = text;
+        return span;
+      });
+      screen.replaceChildren(...spans);
+      slider.max = sequence.length;
+      slider.value = frameIndex + 1;
+      count.value = slider.value + " / " + slider.max;
+      slider.setAttribute("aria-valuetext", "Frame " + slider.value + " of " + slider.max);
+    }
+
+    function pause() {
+      clearTimeout(timer);
+      timer = null;
+      play.textContent = "Play";
+    }
+
+    function scheduleNext() {
+      timer = setTimeout(() => {
+        if (frameIndex + 1 < frames().length) {
+          frameIndex++;
+        } else if (chapter.selectedIndex + 1 < chapters.length) {
+          chapter.selectedIndex++;
+          frameIndex = 0;
+        } else {
+          pause();
+          return;
+        }
+        render();
+        scheduleNext();
+      }, frames()[frameIndex].ms);
+    }
+
+    play.addEventListener("click", () => {
+      if (timer !== null) {
+        pause();
+        return;
+      }
+      if (chapter.selectedIndex === chapters.length - 1 && frameIndex === frames().length - 1) {
+        chapter.selectedIndex = 0;
+        frameIndex = 0;
+        render();
+      }
+      play.textContent = "Pause";
+      scheduleNext();
+    });
+    chapter.addEventListener("change", () => {
+      pause();
+      frameIndex = 0;
+      render();
+    });
+    slider.addEventListener("input", () => {
+      pause();
+      frameIndex = slider.valueAsNumber - 1;
+      render();
+    });
+    render();
+  </script>
+</body>
+</html>
