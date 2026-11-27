@@ -21,36 +21,30 @@ body {
     text-transform: uppercase;
 }
 
-.header-content p {
+#render-status {
     margin: 0;
     font-size: 0.75rem;
-    color: #888888;
+    color: #bfd0d7;
     font-weight: 300;
     letter-spacing: 0.05em;
 }
 
-.status-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0;
-    background: transparent;
-    border: none;
-}
-
-.status-dot {
-    width: 4px;
-    height: 4px;
+#render-status::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 8px;
     border-radius: 50%;
-    background: #ffffff;
-    animation: none;
+    background: currentColor;
 }
 
-.status-text {
-    font-size: 0.7rem;
-    font-weight: 300;
-    color: #888888;
-    letter-spacing: 0.05em;
+#render-status[data-state="active"]::before { color: #88e8ce; }
+#render-status[data-state="failed"] { color: #ffac9c; }
+
+.three-container canvas {
+    display: block;
+    touch-action: none;
 }
 
 /* 3D Architecture Container */
@@ -66,6 +60,7 @@ body {
 }
 
 .header-3d {
+    pointer-events: none;
     position: absolute;
     top: 0;
     left: 0;
@@ -90,21 +85,54 @@ body {
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;
-}
-
-.control-hint {
-    background: rgba(0, 0, 0, 0.7);
+    box-sizing: border-box;
+    width: max-content;
+    max-width: calc(100% - 20px);
+    text-align: center;
+    background: rgba(7, 15, 24, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
-    padding: 12px 16px;
+    padding: 10px 14px;
     color: #ffffff;
     font-size: 0.7rem;
     font-weight: 300;
     letter-spacing: 0.05em;
-    backdrop-filter: blur(10px);
 }
 
-.control-hint i {
-    margin-right: 8px;
-    color: #00ff88;
+#focus-name {
+    color: #bcf1ec;
+    font: 0.8rem monospace;
+}
+
+#scene-controls {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 7px 0;
+    padding: 0;
+    border: 0;
+}
+
+#scene-controls button {
+    font: inherit;
+    font-size: 0.8rem;
+    color: #e0eef3;
+    background: #14222c;
+    border: 1px solid #4a606d;
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+#scene-controls button:enabled:hover,
+#scene-controls button:focus-visible {
+    outline: 2px solid #9be0de;
+}
+
+#scene-controls button:disabled { opacity: 0.5; cursor: default; }
+kbd { color: #9cb8c6; }
+.control-hint {
+    margin: 0;
+    color: #c0ccd4;
 }

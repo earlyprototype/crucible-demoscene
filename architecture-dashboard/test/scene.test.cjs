@@ -5,20 +5,73 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const dashboard = path.join(__dirname, '..');
+const script = readFileSync(path.join(dashboard, 'assets/js/3d-architecture.js'), 'utf8');
+
+function dashboardFixture(globals = {}) {
+    const elements = new Map();
+    const document = new EventTarget();
+    document.getElementById = (id) => {
+        if (!elements.has(id)) elements.set(id, { dataset: {}, textContent: '' });
+        return elements.get(id);
+    };
+    const context = vm.createContext({ document, window: { innerWidth: 800, innerHeight: 600 }, ...globals });
+    const Architecture3D = vm.runInContext(script + '\nArchitecture3D', context);
+    return { document, Architecture3D };
+}
 
 test('the scene hint and README describe the available camera controls', () => {
     for (const file of ['index.html', 'README.md']) {
         const text = readFileSync(path.join(dashboard, file), 'utf8');
         assert.match(text, /drag to rotate/i);
         assert.match(text, /scroll to zoom/i);
-        assert.doesNotMatch(text, /click to focus/i);
+        assert.match(text, /click to focus/i);
     }
 });
 
+for (const [name, libraries, explanation] of [
+    ['missing Three.js', {}, /Three\.js/],
+    ['missing OrbitControls', { THREE: {} }, /OrbitControls/],
+    ['unavailable WebGL', {
+        THREE: {
+            ...require('three'),
+            OrbitControls: class {},
+            WebGLRenderer: class { constructor() { throw new Error('WebGL context unavailable'); } }
+        }
+    }, /WebGL context unavailable/]
+]) {
+    test(`${name} shows a failed status and the cause`, () => {
+        const { document } = dashboardFixture(libraries);
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+
+        assert.match(document.getElementById('render-status').textContent, /failed/i);
+        assert.match(document.getElementById('render-status').textContent, explanation);
+    });
+}
+
+test('status turns active after a frame and the render loop stops on failure', () => {
+    const frames = [];
+    const { Architecture3D, document } = dashboardFixture({ requestAnimationFrame: fn => frames.push(fn) });
+    const scene = Object.create(Architecture3D.prototype);
+    const status = document.getElementById('render-status');
+    status.textContent = 'Starting';
+    scene.services = {};
+    scene.dataTriangles = [];
+    scene.controls = { update() {} };
+    scene.renderer = {
+        render() { assert.equal(status.textContent, 'Starting'); },
+        getContext() { return { isContextLost: () => false }; },
+        info: { programs: [], render: { calls: 1 } }
+    };
+    scene.animate();
+    assert.match(status.textContent, /active/i);
+    scene.renderer.render = () => { throw new Error('frame interrupted'); };
+    frames.shift()();
+    assert.match(status.textContent, /failed.*frame interrupted/i);
+    assert.equal(frames.length, 0);
+});
+
 test('the memory crystal breathes and keeps its translucency without a status feed', () => {
-    const script = readFileSync(path.join(dashboard, 'assets/js/3d-architecture.js'), 'utf8');
-    const context = vm.createContext({ document: new EventTarget(), requestAnimationFrame() {} });
-    const Architecture3D = vm.runInContext(script + '\nArchitecture3D', context);
+    const { Architecture3D } = dashboardFixture();
     const scene = Object.create(Architecture3D.prototype);
     const edgeMesh = { scale: { setScalar(value) { this.value = value; } }, material: { opacity: 0.9 } };
     const innerMesh = { scale: { setScalar() {} }, material: { opacity: 0.3 } };
@@ -36,10 +89,7 @@ test('the memory crystal breathes and keeps its translucency without a status fe
     scene.services = { 'memory-api': memory };
     scene.time = 0;
     scene.dataTriangles = [];
-    scene.controls = { update() {} };
-    scene.renderer = { render() {} };
-
-    scene.animate();
+    scene.updateScene();
     assert.ok(edgeMesh.scale.value > 1);
     assert.equal(edgeMesh.material.opacity, 0.9);
     assert.equal(innerMesh.material.opacity, 0.3);

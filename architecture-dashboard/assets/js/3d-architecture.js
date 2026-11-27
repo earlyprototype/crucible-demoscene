@@ -8,8 +8,13 @@ class Architecture3D {
         this.renderer = null;
         this.controls = null;
         this.services = {};
+        this.pickableParts = [];
+        this.focusedService = null;
+        this.lastFocusPosition = new THREE.Vector3();
+        this.focusOffset = new THREE.Vector3();
         this.dataTriangles = [];
         this.isInitialized = false;
+        this.failed = false;
         this.time = 0;
         
         // Service positions in 3D space - Thalamus centered, others positioned around it
@@ -35,9 +40,6 @@ class Architecture3D {
         this.createServiceModels();
         this.createDataTriangles();
         this.animate();
-        
-        this.isInitialized = true;
-        console.log('Advanced 3D Architecture initialized');
     }
     
     setupScene() {
@@ -49,13 +51,17 @@ class Architecture3D {
     }
     
     setupCamera() {
-        this.camera = new THREE.PerspectiveCamera(
-            60, 
-            window.innerWidth / window.innerHeight, 
-            0.1, 
-            1000
-        );
+        this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+        this.updateCameraProjection();
         this.camera.position.set(0, 0, 35);
+    }
+
+    updateCameraProjection() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        // Keep a 60-degree field of view along the shorter screen dimension.
+        const halfHeight = Math.tan(Math.PI / 6) / Math.min(1, this.camera.aspect);
+        this.camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(halfHeight));
+        this.camera.updateProjectionMatrix();
     }
     
     setupRenderer() {
@@ -73,6 +79,9 @@ class Architecture3D {
         this.renderer.toneMappingExposure = 1.2;
         
         container.appendChild(this.renderer.domElement);
+        this.renderer.domElement.addEventListener('webglcontextlost', () => {
+            this.fail('The WebGL context was lost. Reload to start the renderer again.');
+        });
     }
     
     setupControls() {
@@ -85,6 +94,85 @@ class Architecture3D {
         this.controls.maxPolarAngle = Math.PI / 2;
         this.controls.autoRotate = false; // Stop system rotation
         this.controls.autoRotateSpeed = 0.5;
+
+        this.setupPicking();
+        this.setupViewControls();
+    }
+
+    setupPicking() {
+        const canvas = this.renderer.domElement;
+        const raycaster = new THREE.Raycaster();
+        raycaster.params.Line.threshold = 0.15;
+        let press = null;
+        canvas.addEventListener('pointerdown', event => {
+            press = null;
+            if (!event.isPrimary || event.button !== 0 || !this.isInitialized ||
+                event.ctrlKey || event.metaKey || event.shiftKey) return;
+            press = { id: event.pointerId, x: event.clientX, y: event.clientY };
+            canvas.setPointerCapture(event.pointerId);
+        });
+        const checkDrag = event => {
+            if (press && event.pointerId === press.id &&
+                Math.hypot(event.clientX - press.x, event.clientY - press.y) > 4) press = null;
+        };
+        canvas.addEventListener('pointermove', checkDrag);
+        canvas.addEventListener('lostpointercapture', () => { press = null; });
+        canvas.addEventListener('pointercancel', () => { press = null; });
+        canvas.addEventListener('pointerup', event => {
+            checkDrag(event);
+            if (!press || press.id !== event.pointerId || !this.isInitialized) return;
+            press = null;
+            const bounds = canvas.getBoundingClientRect();
+            const pointer = new THREE.Vector2(
+                (event.clientX - bounds.left) / bounds.width * 2 - 1,
+                1 - (event.clientY - bounds.top) / bounds.height * 2
+            );
+            raycaster.setFromCamera(pointer, this.camera);
+            const [hit] = raycaster.intersectObjects(this.pickableParts);
+            if (hit) this.focusService(this.services[hit.object.userData.serviceId]);
+        });
+    }
+
+    setupViewControls() {
+        document.getElementById('scene-controls').addEventListener('click', event => {
+            const button = event.target.closest('button');
+            if (button) this.changeView(button.dataset.action);
+        });
+        const keys = { '[': 'previous', ']': 'next', Home: 'reset' };
+        window.addEventListener('keydown', event => {
+            if (!this.isInitialized || event.altKey || event.ctrlKey || event.metaKey ||
+                event.target.isContentEditable || event.target.matches?.('input, textarea, select')) return;
+            if (Object.hasOwn(keys, event.key)) {
+                event.preventDefault();
+                this.changeView(keys[event.key]);
+            }
+        });
+    }
+
+    changeView(action) {
+        if (action === 'reset') {
+            this.focusedService = null;
+            // Consume any remaining drag momentum before restoring the saved view.
+            this.controls.enableDamping = false;
+            this.controls.update();
+            this.controls.reset();
+            this.controls.enableDamping = true;
+            document.getElementById('focus-name').textContent = 'All services';
+            return;
+        }
+        const services = Object.values(this.services);
+        const step = action === 'next' ? 1 : -1;
+        const index = this.focusedService ? services.indexOf(this.focusedService) : (step > 0 ? -1 : 0);
+        this.focusService(services[(index + step + services.length) % services.length]);
+    }
+
+    focusService(service) {
+        this.focusedService = service;
+        this.lastFocusPosition.copy(service.position);
+        this.camera.position.add(this.focusOffset.subVectors(service.position, this.controls.target));
+        this.controls.target.copy(service.position);
+        this.controls.update();
+        document.getElementById('focus-name').textContent = service.userData.serviceId;
     }
     
     setupLighting() {
@@ -96,8 +184,8 @@ class Architecture3D {
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         directionalLight.position.set(20, 20, 15);
         directionalLight.castShadow = true;
-        directionalLight.shadow.mapSize.width = 4096;
-        directionalLight.shadow.mapSize.height = 4096;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
         directionalLight.shadow.camera.near = 0.5;
         directionalLight.shadow.camera.far = 100;
         directionalLight.shadow.camera.left = -30;
@@ -137,6 +225,10 @@ class Architecture3D {
             const model = this.createAdvancedIceModel(serviceId, pos);
             this.services[serviceId] = model;
             this.scene.add(model);
+            for (const part of [model, model.userData.edgeMesh, model.userData.innerMesh]) {
+                part.userData.serviceId = serviceId;
+                this.pickableParts.push(part);
+            }
         });
     }
     
@@ -167,6 +259,8 @@ class Architecture3D {
         const material = new THREE.MeshPhongMaterial({
             color: this.getServiceColor(serviceId),
             transparent: true,
+            flatShading: true,
+            depthWrite: false,
             opacity: (serviceId === 'lia-cli' || serviceId === 'thalamus-gateway') ? 0.3 : 0.2, // Partial transparency for LIA_CLI and Thalamus
             shininess: 200,
             specular: 0x888888,
@@ -174,6 +268,15 @@ class Architecture3D {
             emissiveIntensity: 0.1,
             side: THREE.DoubleSide
         });
+        // Add a cool grazing-angle highlight before Phong tone mapping and fog.
+        material.onBeforeCompile = shader => {
+            shader.fragmentShader = shader.fragmentShader.replace('#include <envmap_fragment>', `
+                #include <envmap_fragment>
+                float rim = pow(1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0), 2.0);
+                outgoingLight += vec3(0.18, 0.65, 0.82) * rim;
+                diffuseColor.a += 0.35 * rim;
+            `);
+        };
         
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.set(position.x, position.y, position.z);
@@ -223,16 +326,14 @@ class Architecture3D {
             baseMesh.scale.setScalar(scale * 1.35); // Match edge mesh scale
             this.scene.add(baseMesh);
         } else {
-            edgeGeometry = geometry.clone();
+            edgeGeometry = geometry;
         }
-        const edgeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+        const edgeMaterial = new THREE.LineBasicMaterial({
+            color: 0xd3eef6,
             transparent: true,
-            opacity: 0.9,
-            wireframe: true,
-            wireframeLinewidth: 2
+            opacity: 0.9
         });
-        const edgeMesh = new THREE.Mesh(edgeGeometry, edgeMaterial);
+        const edgeMesh = new THREE.LineSegments(new THREE.WireframeGeometry(edgeGeometry), edgeMaterial);
         edgeMesh.position.set(position.x, position.y, position.z);
         
         // Apply same rotation to edge mesh for bottom 4 modules
@@ -269,50 +370,30 @@ class Architecture3D {
         this.scene.add(edgeMesh);
         
                  // Add inner crystal structure with glimmering colors for Thalamus
-         let innerGeometry, innerMaterial;
+         let innerGeometry;
          if (serviceId === 'thalamus-gateway') {
              // Create pyramid inner geometry for Thalamus - another 50% bigger
              const pyramidGeometries = this.createPyramidGeometry(1.35); // Increased from 0.9 to 1.35 (another 50% bigger)
              innerGeometry = pyramidGeometries.sideGeometry; // Use sides for inner mesh
-             innerMaterial = new THREE.MeshBasicMaterial({
-                 color: 0xffffff,
-                 transparent: true,
-                 opacity: 1.0, // Fully opaque for Thalamus inner mesh
-                 wireframe: true
-             });
          } else if (serviceId === 'memory-api' || serviceId === 'cortex-api' || serviceId === 'axon-api' || serviceId === 'dendrite-api') {
              // Create cube inner geometry for bottom 4 modules
              innerGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
-             innerMaterial = new THREE.MeshBasicMaterial({
-                 color: 0xffffff,
-                 transparent: true,
-                 opacity: 0.3,
-                 wireframe: true
-             });
          } else if (serviceId === 'lia-cli') {
              // Create smaller inner rectangle for LIA_CLI letterbox
              innerGeometry = new THREE.BoxGeometry(3, 0.75, 2.25); // Half the size of the outer rectangle
              
              // Set pivot point to center of smallest face (Y-axis face) - same as outer mesh
              innerGeometry.translate(0, -0.375, 0); // Move down by half the height (0.75/2 = 0.375)
-             
-             innerMaterial = new THREE.MeshBasicMaterial({
-                 color: 0xffffff,
-                 transparent: true,
-                 opacity: 0.3,
-                 wireframe: true
-             });
          } else {
              innerGeometry = new THREE.IcosahedronGeometry(0.6, 1);
-             innerMaterial = new THREE.MeshBasicMaterial({
-                 color: 0xffffff,
-                 transparent: true,
-                 opacity: 0.3,
-                 wireframe: true
-             });
          }
         
-        const innerMesh = new THREE.Mesh(innerGeometry, innerMaterial);
+        const innerMaterial = new THREE.LineBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: serviceId === 'thalamus-gateway' ? 1.0 : 0.3
+        });
+        const innerMesh = new THREE.LineSegments(new THREE.WireframeGeometry(innerGeometry), innerMaterial);
         innerMesh.position.set(position.x, position.y, position.z);
         innerMesh.scale.setScalar(scale);
         
@@ -834,8 +915,42 @@ class Architecture3D {
     }
     
     animate() {
-        requestAnimationFrame(() => this.animate());
-        
+        if (this.failed) return;
+        try {
+            this.updateScene();
+            if (this.focusedService) {
+                const position = this.focusedService.position;
+                this.focusOffset.subVectors(position, this.lastFocusPosition);
+                this.camera.position.add(this.focusOffset);
+                this.controls.target.add(this.focusOffset);
+                this.lastFocusPosition.copy(position);
+            }
+            this.controls.update();
+            this.renderer.render(this.scene, this.camera);
+            if (!this.isInitialized) {
+                if (this.renderer.getContext().isContextLost() || !this.renderer.info.render.calls) {
+                    throw new Error('WebGL did not draw the scene.');
+                }
+                if (this.renderer.info.programs.some(program => program.diagnostics?.runnable === false)) {
+                    throw new Error('The crystal shader could not compile.');
+                }
+                setRenderStatus('active', '3D System Active');
+                this.isInitialized = true;
+            }
+            requestAnimationFrame(() => this.animate());
+        } catch (error) {
+            this.fail(error.message);
+        }
+    }
+
+    fail(message) {
+        this.failed = true;
+        this.isInitialized = false;
+        if (this.controls) this.controls.enabled = false;
+        showLoadError(message);
+    }
+
+    updateScene() {
         this.time += 0.016; // 60fps
         
         // Animate services with sophisticated effects
@@ -1099,13 +1214,10 @@ class Architecture3D {
             triangle.material.opacity = pulse * (userData.useWhiteEdge ? 0.9 : 0.6);
         });
         
-        this.controls.update();
-        this.renderer.render(this.scene, this.camera);
     }
     
     onWindowResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
+        this.updateCameraProjection();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 }
@@ -1113,47 +1225,37 @@ class Architecture3D {
 // Initialize 3D architecture when DOM is loaded
 let architecture3D = null;
 
+function setRenderStatus(state, message) {
+    const status = document.getElementById('render-status');
+    status.dataset.state = state;
+    status.textContent = message;
+    document.getElementById('scene-controls').disabled = state !== 'active';
+}
+
 function showLoadError(message) {
-    const container = document.getElementById('three-container');
-    if (container) {
-        container.innerHTML = `<div style="color:#ff6b6b;font-family:monospace;padding:2rem;max-width:32rem;">
-            <strong>Scene failed to load</strong><br>${message}
-        </div>`;
-    }
+    setRenderStatus('failed', '3D renderer failed. ' + message);
     console.error(message);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        console.log('Initializing 3D architecture...');
-
-        // Check if Three.js is loaded
         if (typeof THREE === 'undefined') {
-            showLoadError('Three.js failed to load from the CDN. Check your internet connection (or an ad-blocker/firewall blocking cdnjs.cloudflare.com) and refresh.');
+            showLoadError('Three.js could not load. Check that the script is available and reload.');
             return;
         }
 
-        // Check if OrbitControls is available
         if (typeof THREE.OrbitControls === 'undefined') {
-            showLoadError('OrbitControls failed to load from the CDN (cdn.jsdelivr.net). Check your internet connection and refresh.');
+            showLoadError('OrbitControls could not load. Check that the script is available and reload.');
             return;
         }
 
-        // Initialize 3D architecture
         architecture3D = new Architecture3D();
-        
-        console.log('3D architecture initialized successfully');
-        
-        // Handle window resize
         window.addEventListener('resize', () => {
-            if (architecture3D) {
+            if (architecture3D.isInitialized) {
                 architecture3D.onWindowResize();
             }
         });
-        
-        console.log('Advanced 3D Architecture initialized');
-
     } catch (error) {
-        console.error('Error initializing 3D architecture:', error);
+        showLoadError(error.message);
     }
 });

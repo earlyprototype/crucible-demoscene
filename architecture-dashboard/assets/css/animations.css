@@ -1,17 +1,3 @@
-/* Status Text Animation */
-.status-text {
-    animation: modern-status-pulse 3s ease-in-out infinite;
-}
-
-@keyframes modern-status-pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.7;
-    }
-}
-
 /* Background Shift Animation */
 body {
     animation: modern-background-shift 20s ease-in-out infinite;
@@ -27,7 +13,7 @@ body {
 }
 
 /* Pulse Animation for Status */
-.status-dot {
+#render-status[data-state="active"]::before {
     animation: modern-pulse 2s ease-in-out infinite;
 }
 
